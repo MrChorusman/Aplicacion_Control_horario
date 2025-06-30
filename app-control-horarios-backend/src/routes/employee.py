@@ -2,10 +2,12 @@ from flask import Blueprint, request, jsonify
 from src.models.employee import db, Employee
 from datetime import datetime
 import re
+from flask_security import auth_required, roles_required
 
 employee_bp = Blueprint('employee', __name__)
 
 @employee_bp.route('/employees', methods=['GET'])
+@auth_required('jwt')
 def get_employees():
     """Obtener todos los empleados con filtros opcionales"""
     try:
@@ -57,6 +59,7 @@ def get_employees():
         }), 500
 
 @employee_bp.route('/employees/teams', methods=['GET'])
+@auth_required('jwt')
 def get_teams():
     """Obtener lista de equipos únicos"""
     try:
@@ -78,6 +81,7 @@ def get_teams():
         }), 500
 
 @employee_bp.route('/employees/<int:employee_id>', methods=['GET'])
+@auth_required('jwt')
 def get_employee(employee_id):
     """Obtener un empleado específico por ID"""
     try:
@@ -100,6 +104,8 @@ def get_employee(employee_id):
         }), 500
 
 @employee_bp.route('/employees', methods=['POST'])
+@auth_required('jwt')
+@roles_required('admin')
 def create_employee():
     """Crear un nuevo empleado"""
     try:
@@ -184,6 +190,8 @@ def create_employee():
         }), 500
 
 @employee_bp.route('/employees/<int:employee_id>', methods=['PUT'])
+@auth_required('jwt')
+@roles_required('admin')
 def update_employee(employee_id):
     """Actualizar un empleado existente"""
     try:
@@ -237,6 +245,8 @@ def update_employee(employee_id):
         }), 500
 
 @employee_bp.route('/employees/<int:employee_id>', methods=['DELETE'])
+@auth_required('jwt')
+@roles_required('admin')
 def delete_employee(employee_id):
     """Eliminar un empleado"""
     try:
@@ -267,6 +277,7 @@ def delete_employee(employee_id):
         }), 500
 
 @employee_bp.route('/employees/stats', methods=['GET'])
+@auth_required('jwt')
 def get_employee_stats():
     """Obtener estadísticas generales de empleados"""
     try:

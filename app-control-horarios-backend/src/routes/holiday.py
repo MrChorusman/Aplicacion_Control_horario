@@ -3,11 +3,13 @@ from src.models.employee import db, Holiday
 from src.services.holiday_service import HolidayService
 from datetime import datetime, date
 import calendar as cal
+from flask_security import auth_required
 
 holiday_bp = Blueprint('holiday', __name__)
 holiday_service = HolidayService()
 
 @holiday_bp.route('/holidays/<int:year>/<int:month>', methods=['GET'])
+@auth_required('jwt')
 def get_holidays_by_month(year, month):
     """Obtener festivos de un mes específico"""
     try:
@@ -156,6 +158,7 @@ def get_holidays_by_month(year, month):
         }), 500
 
 @holiday_bp.route('/holidays/<int:year>', methods=['GET'])
+@auth_required('jwt')
 def get_holidays_by_year(year):
     """Obtener todos los festivos de un año específico"""
     try:
@@ -201,6 +204,7 @@ def get_holidays_by_year(year):
         }), 500
 
 @holiday_bp.route('/holidays/working-days/<int:year>/<int:month>', methods=['GET'])
+@auth_required('jwt')
 def get_working_days(year, month):
     """Obtener días laborables de un mes"""
     try:
@@ -241,6 +245,7 @@ def get_working_days(year, month):
         }), 500
 
 @holiday_bp.route('/holidays/communities', methods=['GET'])
+@auth_required('jwt')
 def get_autonomous_communities():
     """Obtener lista de comunidades autónomas disponibles"""
     try:
@@ -262,6 +267,7 @@ def get_autonomous_communities():
         }), 500
 
 @holiday_bp.route('/holidays/check', methods=['POST'])
+@auth_required('jwt')
 def check_holiday():
     """Verificar si una fecha específica es festivo"""
     try:
