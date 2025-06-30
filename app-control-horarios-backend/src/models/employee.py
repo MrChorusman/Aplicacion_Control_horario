@@ -1,8 +1,43 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from flask_security import UserMixin, RoleMixin
 
 # Crear instancia de SQLAlchemy sin inicializar
 db = SQLAlchemy()
+
+# Tabla de asociación para la relación muchos a muchos entre Usuarios y Roles
+roles_users = db.Table('roles_users',
+                       db.Column('user_id', db.Integer(), db.ForeignKey('users.id')),
+                       db.Column('role_id', db.Integer(), db.ForeignKey('roles.id')))
+
+class Role(db.Model, RoleMixin):
+    __tablename__ = 'roles'
+    id = db.Column(db.Integer(), primary_key=True)
+    name = db.Column(db.String(80), unique=True)
+    description = db.Column(db.String(255))
+
+    def __str__(self):
+        return self.name
+
+class User(db.Model, UserMixin):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, index=True)
+    password = db.Column(db.String(255), nullable=False)
+    active = db.Column(db.Boolean())
+    confirmed_at = db.Column(db.DateTime())
+    fs_uniquifier = db.Column(db.String(64), unique=True, nullable=False) # Requerido por Flask-Security-Too 5.0+
+    # Relación con roles
+    roles = db.relationship('Role', secondary=roles_users,
+                            backref=db.backref('users', lazy='dynamic'))
+
+    # Campos adicionales que podríamos querer
+    full_name = db.Column(db.String(200)) # Podríamos enlazar esto a un Empleado o mantenerlo separado
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __str__(self):
+        return self.email
 
 class Employee(db.Model):
     __tablename__ = 'employees'

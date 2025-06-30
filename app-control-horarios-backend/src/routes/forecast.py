@@ -3,11 +3,13 @@ from src.models.employee import Employee, CalendarEntry, Holiday, db
 from src.utils.hours_calculator import HoursCalculator
 from datetime import datetime
 import calendar
+from flask_security import auth_required
 
 forecast_bp = Blueprint('forecast', __name__)
 calculator = HoursCalculator()
 
 @forecast_bp.route('/forecast/<int:year>/<int:month>', methods=['GET'])
+@auth_required('jwt')
 def get_monthly_forecast(year, month):
     """Obtener forecast mensual para todos los empleados o uno específico"""
     try:
@@ -63,6 +65,7 @@ def get_monthly_forecast(year, month):
         }), 500
 
 @forecast_bp.route('/forecast/employee/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
+@auth_required('jwt')
 def get_employee_forecast(employee_id, year, month):
     """Obtener forecast de un empleado específico"""
     try:
@@ -106,6 +109,7 @@ def get_employee_forecast(employee_id, year, month):
         }), 500
 
 @forecast_bp.route('/forecast/team/<string:team_name>/<int:year>/<int:month>', methods=['GET'])
+@auth_required('jwt')
 def get_team_forecast(team_name, year, month):
     """Obtener forecast de un equipo específico"""
     try:
@@ -150,6 +154,7 @@ def get_team_forecast(team_name, year, month):
         }), 500
 
 @forecast_bp.route('/forecast/monthly/<int:year>/<int:month>', methods=['GET'])
+@auth_required('jwt')
 def get_monthly_summary(year, month):
     """Obtener resumen mensual de todos los equipos"""
     try:
@@ -186,6 +191,7 @@ def get_monthly_summary(year, month):
         }), 500
 
 @forecast_bp.route('/forecast/working-days/<int:year>/<int:month>', methods=['GET'])
+@auth_required('jwt')
 def get_working_days(year, month):
     """Obtener días laborables de un mes"""
     try:
@@ -221,6 +227,7 @@ def get_working_days(year, month):
         }), 500
 
 @forecast_bp.route('/forecast/indra-inditex/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
+@auth_required('jwt')
 def get_indra_inditex_hours(employee_id, year, month):
     """Obtener cálculo específico de horas INDRA e INDITEX"""
     try:

@@ -1,6 +1,39 @@
-const API_BASE_URL = 'http://localhost:5002/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002/api';
+const AUTH_URL_PREFIX = '/auth'; // Prefijo para las rutas de Flask-Security-Too
 
 class ApiService {
+  constructor() {
+    this.token = this.getToken();
+    this.userInfo = this.getUserInfo();
+  }
+
+  getToken() {
+    return localStorage.getItem('authToken');
+  }
+
+  setToken(token) {
+    if (token) {
+      localStorage.setItem('authToken', token);
+    } else {
+      localStorage.removeItem('authToken');
+    }
+    this.token = token;
+  }
+
+  getUserInfo() {
+    const info = localStorage.getItem('userInfo');
+    return info ? JSON.parse(info) : null;
+  }
+
+  setUserInfo(userInfo) {
+    if (userInfo) {
+      localStorage.setItem('userInfo', JSON.stringify(userInfo));
+    } else {
+      localStorage.removeItem('userInfo');
+    }
+    this.userInfo = userInfo;
+  }
+
   async request(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
     const config = {
@@ -11,19 +44,121 @@ class ApiService {
       ...options,
     };
 
+    if (this.token && !endpoint.startsWith(AUTH_URL_PREFIX)) { // No enviar token a rutas de auth como login/register
+      config.headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
     try {
       const response = await fetch(url, config);
+
+      if (response.status === 204) { // No content
+        return null;
+      }
+
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        if (response.status === 401 && !endpoint.startsWith(AUTH_URL_PREFIX)) {
+          // Token inválido o expirado, desloguear
+          this.logout();
+          // Podríamos redirigir al login aquí o dejar que el AuthContext lo maneje
+          window.location.href = '/login';
+        }
+        throw new Error(data.message || data.description || `HTTP error! status: ${response.status}`);
       }
       
       return data;
     } catch (error) {
-      console.error(`API Error (${endpoint}):`, error);
+      console.error(`API Error (${endpoint}):`, error.message);
+      // No relanzar el error aquí directamente si queremos manejarlo en el AuthContext
+      // o en el componente que llama. Por ahora lo relanzo para mantener comportamiento.
       throw error;
     }
+  }
+
+  // --- Autenticación ---
+  async login(email, password) {
+    try {
+      const response = await this.request(`${AUTH_URL_PREFIX}/login`, {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      // Flask-Security-Too devuelve el token en response.user.authentication_token o similar
+      // o directamente en response.authentication_token
+      // Necesitamos verificar la estructura exacta de la respuesta del login
+      // Asumamos que es response.authentication_token y response.user para el usuario
+      // La respuesta de Flask-Security-Too es usualmente:
+      // {"response": {"user": {"id": "...", "email": "...", "roles": [...]}, "token": "..."}}
+      // o {"meta": {"token": "...", "user": ...}}
+      // O si es `SECURITY_RETURN_GENERIC_RESPONSES=True` es {"access_token": ..., "user": ...}
+      // Vamos a asumir que el token está en response.access_token o response.token
+      // y los datos del usuario en response.user
+
+      let token = null;
+      let user = null;
+
+      if (response && response.response && response.response.token) { // Estructura común
+        token = response.response.token;
+        user = response.response.user;
+      } else if (response && response.response && response.response.user && response.response.user.authentication_token) { // Otra estructura
+        token = response.response.user.authentication_token;
+        user = response.response.user;
+      } else if (response && response.access_token) { // Estructura con SECURITY_RETURN_GENERIC_RESPONSES=True
+         token = response.access_token;
+         user = response.user;
+      } else if (response && response.token) { // Estructura más simple
+        token = response.token;
+        user = response.user; // Asumimos que viene user también
+      }
+
+
+      if (token) {
+        this.setToken(token);
+        if (user) {
+          this.setUserInfo({ email: user.email, roles: user.roles || [], id: user.id || user.fs_uniquifier });
+        }
+        return { success: true, user: this.userInfo };
+      } else {
+        // Si la estructura del token no se encuentra, pero la petición fue ok (raro)
+        console.error("Login successful but token not found in response:", response);
+        throw new Error(response.message || "Token no encontrado en la respuesta del login");
+      }
+    } catch (error) {
+      this.logout(); // Limpiar en caso de error
+      console.error("Login failed:", error.message);
+      throw error; // Relanzar para que el componente de login lo maneje
+    }
+  }
+
+  async register(userData) { // userData: { email, password, roles (opcional) }
+    try {
+        const response = await this.request(`${AUTH_URL_PREFIX}/register`, {
+            method: 'POST',
+            body: JSON.stringify(userData),
+        });
+        // Flask-Security-Too devuelve el usuario creado, no un token directamente en el registro.
+        // El usuario tendría que loguearse después.
+        if (response && response.response && response.response.user) {
+            return { success: true, user: response.response.user };
+        }
+        return { success: true, message: "Registro exitoso. Por favor, inicie sesión." };
+    } catch (error) {
+        console.error("Registration failed:", error.message);
+        throw error;
+    }
+  }
+
+  logout() {
+    this.setToken(null);
+    this.setUserInfo(null);
+    // No se necesita llamar a /api/auth/logout si el token JWT se maneja solo en el cliente,
+    // pero es buena práctica llamarlo si el backend invalida tokens o sesiones.
+    // Flask-Security-Too con JWT puro no mantiene estado del token en el servidor,
+    // por lo que el logout es principalmente una operación del cliente.
+    // Sin embargo, si se usa `SECURITY_BLACKLIST_ENABLED = True`, entonces sí se debe llamar.
+    // Por ahora, lo llamaremos por si acaso y para consistencia.
+    return this.request(`${AUTH_URL_PREFIX}/logout`, { method: 'POST' })
+      .catch(err => console.warn("Error en API logout (puede ser normal si el token ya fue invalidado o no había sesión):", err.message));
   }
 
   // Empleados
