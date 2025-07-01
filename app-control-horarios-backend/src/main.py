@@ -33,7 +33,9 @@ if not app.config['SECRET_KEY'] or not app.config['SECURITY_PASSWORD_SALT']:
 
 app.config['SECURITY_PASSWORD_HASH'] = 'bcrypt'
 app.config['SECURITY_TOKEN_AUTHENTICATION_HEADER'] = "Authorization"
-app.config['SECURITY_USER_IDENTITY_ATTRIBUTES'] = ('email',) # Usar tupla
+app.config['SECURITY_USER_IDENTITY_ATTRIBUTES'] = [
+    {"email": {"required": True, "allow_unverified": True}}
+]
 app.config['SECURITY_LOGIN_URL'] = '/api/login'
 app.config['SECURITY_LOGOUT_URL'] = '/api/logout'
 app.config['SECURITY_REGISTER_URL'] = '/api/register'
