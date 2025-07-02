@@ -1,47 +1,23 @@
 import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import EmployeeForm from './components/EmployeeForm';
 import Calendar from './components/Calendar';
 import Summary from './components/Summary';
 import Dashboard from './components/Dashboard';
-import AdminPanel from './components/AdminPanel';
+import LoginPage from './components/LoginPage';
+import ProtectedRoute from './components/ProtectedRoute';
 import AdminPasswordModal from './components/AdminPasswordModal';
-import { useAdmin } from './context/AdminContext';
 import './App.css';
 
-function App() {
+// Layout principal con navegación lateral y modal admin
+const AppLayout = () => {
+  const { isAuthenticated, logout, user } = useAuth();
   const [currentView, setCurrentView] = useState('dashboard');
   const [showAdminModal, setShowAdminModal] = useState(false);
-  const { isAdmin, setIsAdmin } = useAdmin();
 
-  const renderContent = () => {
-    switch (currentView) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'registro':
-        return <EmployeeForm />;
-      case 'calendario':
-        return <Calendar />;
-      case 'resumen':
-        return <Summary />;
-      case 'admin':
-        return <AdminPanel />;
-      default:
-        return <Dashboard />;
-    }
-  };
-
-  // Cuando el usuario pulsa "Panel Administrador"
-  const handleAdminPanelClick = () => {
-    if (!isAdmin) {
-      setShowAdminModal(true);
-    } else {
-      setCurrentView('admin');
-    }
-  };
-
-  // Cuando la contraseña es correcta
+  // Puedes agregar lógica para roles aquí si lo necesitas
   const handleAdminValidated = () => {
-    setIsAdmin(true);
     setShowAdminModal(false);
     setCurrentView('admin');
   };
@@ -50,9 +26,16 @@ function App() {
     <div className="App">
       <header className="app-header">
         <h1>Control de Horarios</h1>
-        <p>Sistema de Gestión de Equipos</p>
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+          <p>Sistema de Gestión de Equipos</p>
+          {isAuthenticated && (
+            <div style={{ marginRight: '20px' }}>
+              <span style={{ color: 'white', marginRight: '10px' }}>Hola, {user?.email} ({user?.roles?.join(', ') || 'user'})</span>
+              <button onClick={logout} style={{padding: '5px 10px'}}>Logout</button>
+            </div>
+          )}
+        </div>
       </header>
-      
       <div className="app-container">
         <nav className="sidebar">
           <ul>
@@ -80,15 +63,7 @@ function App() {
             >
               📋 Resumen Datos
             </li>
-            <li 
-              className={currentView === 'admin' ? 'active' : ''}
-              onClick={handleAdminPanelClick}
-              style={{ marginTop: 16, fontWeight: 600 }}
-            >
-              🛡️ Panel Administrador
-            </li>
           </ul>
-          
           <div className="legend">
             <h3>Leyenda de Actividades</h3>
             <div className="legend-item">
@@ -117,12 +92,15 @@ function App() {
             </div>
           </div>
         </nav>
-        
         <main className="main-content">
-          {renderContent()}
+          {/* Renderiza el contenido según la vista seleccionada */}
+          {currentView === 'dashboard' && <Dashboard />}
+          {currentView === 'registro' && <EmployeeForm />}
+          {currentView === 'calendario' && <Calendar />}
+          {currentView === 'resumen' && <Summary />}
+          {/* Si usas rutas anidadas, puedes usar <Outlet /> aquí */}
         </main>
       </div>
-
       {/* Modal de contraseña de administrador */}
       <AdminPasswordModal
         open={showAdminModal}
@@ -130,6 +108,29 @@ function App() {
         onValidate={handleAdminValidated}
       />
     </div>
+  );
+};
+
+function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          {/* <Route path="/register" element={<RegisterPage />} /> */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          />
+          {/* Ruta catch-all o página 404 si es necesario */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </Router>
   );
 }
 

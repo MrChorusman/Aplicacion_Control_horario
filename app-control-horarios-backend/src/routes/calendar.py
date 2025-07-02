@@ -2,10 +2,12 @@ from flask import Blueprint, request, jsonify
 from src.models.employee import db, Employee, CalendarEntry, Holiday
 from datetime import datetime, date, timedelta
 import calendar as cal
+from flask_security import auth_required
 
 calendar_bp = Blueprint('calendar', __name__)
 
 @calendar_bp.route('/calendar/<int:year>/<int:month>', methods=['GET'])
+@auth_required('jwt')
 def get_calendar_data(year, month):
     """Obtener datos del calendario para un mes específico"""
     try:
@@ -99,6 +101,7 @@ def get_calendar_data(year, month):
         }), 500
 
 @calendar_bp.route('/calendar/entry', methods=['POST'])
+@auth_required('jwt')
 def create_calendar_entry():
     """Crear una nueva entrada en el calendario"""
     try:
@@ -200,6 +203,7 @@ def create_calendar_entry():
         }), 500
 
 @calendar_bp.route('/calendar/entry/<int:entry_id>', methods=['DELETE'])
+@auth_required('jwt')
 def delete_calendar_entry(entry_id):
     """Eliminar una entrada del calendario"""
     try:
@@ -228,6 +232,7 @@ def delete_calendar_entry(entry_id):
         }), 500
 
 @calendar_bp.route('/calendar/employee/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
+@auth_required('jwt')
 def get_employee_calendar(employee_id, year, month):
     """Obtener calendario específico de un empleado"""
     try:
