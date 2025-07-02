@@ -3,10 +3,15 @@ import EmployeeForm from './components/EmployeeForm';
 import Calendar from './components/Calendar';
 import Summary from './components/Summary';
 import Dashboard from './components/Dashboard';
+import AdminPanel from './components/AdminPanel';
+import AdminPasswordModal from './components/AdminPasswordModal';
+import { useAdmin } from './context/AdminContext';
 import './App.css';
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard');
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const { isAdmin, setIsAdmin } = useAdmin();
 
   const renderContent = () => {
     switch (currentView) {
@@ -18,9 +23,27 @@ function App() {
         return <Calendar />;
       case 'resumen':
         return <Summary />;
+      case 'admin':
+        return <AdminPanel />;
       default:
         return <Dashboard />;
     }
+  };
+
+  // Cuando el usuario pulsa "Panel Administrador"
+  const handleAdminPanelClick = () => {
+    if (!isAdmin) {
+      setShowAdminModal(true);
+    } else {
+      setCurrentView('admin');
+    }
+  };
+
+  // Cuando la contraseña es correcta
+  const handleAdminValidated = () => {
+    setIsAdmin(true);
+    setShowAdminModal(false);
+    setCurrentView('admin');
   };
 
   return (
@@ -57,6 +80,13 @@ function App() {
             >
               📋 Resumen Datos
             </li>
+            <li 
+              className={currentView === 'admin' ? 'active' : ''}
+              onClick={handleAdminPanelClick}
+              style={{ marginTop: 16, fontWeight: 600 }}
+            >
+              🛡️ Panel Administrador
+            </li>
           </ul>
           
           <div className="legend">
@@ -92,6 +122,13 @@ function App() {
           {renderContent()}
         </main>
       </div>
+
+      {/* Modal de contraseña de administrador */}
+      <AdminPasswordModal
+        open={showAdminModal}
+        onClose={() => setShowAdminModal(false)}
+        onValidate={handleAdminValidated}
+      />
     </div>
   );
 }

@@ -1,7 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
-# Crear instancia de SQLAlchemy sin inicializar
 db = SQLAlchemy()
 
 class Employee(db.Model):
@@ -14,9 +13,11 @@ class Employee(db.Model):
     hours_fri = db.Column(db.Float, nullable=False)
     vacation_days = db.Column(db.Integer, nullable=False)
     free_hours = db.Column(db.Integer, nullable=False)
-    autonomous_community = db.Column(db.String(50), nullable=False)
+    autonomous_community_id = db.Column(db.Integer, db.ForeignKey('autonomous_communities.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    autonomous_community = db.relationship('AutonomousCommunity', backref='employees')
     
     # Relación con entradas de calendario
     calendar_entries = db.relationship('CalendarEntry', backref='employee', lazy=True, cascade='all, delete-orphan')
@@ -33,7 +34,8 @@ class Employee(db.Model):
             'hours_fri': self.hours_fri,
             'vacation_days': self.vacation_days,
             'free_hours': self.free_hours,
-            'autonomous_community': self.autonomous_community,
+            'autonomous_community_id': self.autonomous_community_id,
+            'autonomous_community_name': self.autonomous_community.name if self.autonomous_community else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -131,37 +133,53 @@ class CalendarEntry(db.Model):
             'C': {'name': 'Permiso/Otro', 'color': '#bbdefb', 'requires_hours': False}
         }
 
+class AutonomousCommunity(db.Model):
+    __tablename__ = 'autonomous_communities'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+
+    def __repr__(self):
+        return f'<AutonomousCommunity {self.name}>'
+
+class Province(db.Model):
+    __tablename__ = 'provinces'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    autonomous_community_id = db.Column(db.Integer, db.ForeignKey('autonomous_communities.id'), nullable=False)
+    autonomous_community = db.relationship('AutonomousCommunity', backref='provinces')
+
+    def __repr__(self):
+        return f'<Province {self.name} ({self.autonomous_community_id})>'
+
 class Holiday(db.Model):
     __tablename__ = 'holidays'
     
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, nullable=False, index=True)
     name = db.Column(db.String(200), nullable=False)
-    autonomous_community = db.Column(db.String(50), nullable=True, index=True)
-    type = db.Column(db.String(20), nullable=False)  # national, regional, local
+    autonomous_community_id = db.Column(db.Integer, db.ForeignKey('autonomous_communities.id'), nullable=True, index=True)
+    province_id = db.Column(db.Integer, db.ForeignKey('provinces.id'), nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
+    autonomous_community = db.relationship('AutonomousCommunity', backref='holidays')
+    province = db.relationship('Province', backref='holidays')
+
     # Índice único para evitar duplicados
     __table_args__ = (
-        db.UniqueConstraint('date', 'autonomous_community', name='unique_date_community'),
-        db.Index('idx_date_community', 'date', 'autonomous_community'),
+        db.UniqueConstraint('date', 'autonomous_community_id', 'province_id', name='unique_date_community_province'),
+        db.Index('idx_date_community_province', 'date', 'autonomous_community_id', 'province_id'),
     )
     
     def __repr__(self):
-        return f'<Holiday {self.name} - {self.date} - {self.autonomous_community}>'
+        return f'<Holiday {self.name} - {self.date} - {self.autonomous_community_id} - {self.province_id}>'
     
     def to_dict(self):
         return {
             'id': self.id,
             'date': self.date.isoformat() if self.date else None,
             'name': self.name,
-            'autonomous_community': self.autonomous_community,
-            'type': self.type,
+            'autonomous_community': self.autonomous_community_id,
+            'province': self.province_id,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-    
-    @staticmethod
-    def get_autonomous_communities():
-        """Retorna el mapeo de comunidades autónomas"""
-        return Employee.get_autonomous_communities()
 

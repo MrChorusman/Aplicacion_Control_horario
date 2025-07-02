@@ -43,12 +43,14 @@ from src.routes.employee import employee_bp
 from src.routes.calendar import calendar_bp
 from src.routes.forecast import forecast_bp
 from src.routes.holiday import holiday_bp
+from src.routes.auth import auth_bp
 
 # Registrar blueprints
 app.register_blueprint(employee_bp, url_prefix='/api')
 app.register_blueprint(calendar_bp, url_prefix='/api')
 app.register_blueprint(forecast_bp, url_prefix='/api')
 app.register_blueprint(holiday_bp, url_prefix='/api')
+app.register_blueprint(auth_bp, url_prefix='/api')
 
 # Crear las tablas e inicializar festivos
 with app.app_context():
