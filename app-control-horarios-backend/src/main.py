@@ -1,11 +1,11 @@
 from flask import Flask, send_from_directory, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy # type: ignore
+from flask_cors import CORS # type: ignore
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv # type: ignore
 from flask_security import Security, SQLAlchemyUserDatastore, utils
-from flask_bcrypt import Bcrypt
-from datetime import timedelta # Importar timedelta
+from flask_bcrypt import Bcrypt # type: ignore
+from datetime import timedelta, datetime # Importar timedelta y datetime
 
 # Cargar variables de entorno
 load_dotenv()
@@ -92,7 +92,6 @@ db.init_app(app)
 
 # Importar modelos después de inicializar db
 from src.models.employee import Employee, CalendarEntry, Holiday, User, Role # Añadir User y Role
-from datetime import datetime # Añadir datetime
 
 # Configurar Flask-Security-Too
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)

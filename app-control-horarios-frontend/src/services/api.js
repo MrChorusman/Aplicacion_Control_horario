@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002/api';
-const AUTH_URL_PREFIX = '/auth'; // Prefijo para las rutas de Flask-Security-Too
+const AUTH_URL_PREFIX = '/api/auth'; // Prefijo para las rutas de Flask-Security-Too (debe coincidir con SECURITY_URL_PREFIX del backend)
 
 class ApiService {
   constructor() {

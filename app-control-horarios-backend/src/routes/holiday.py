@@ -1,9 +1,9 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify # type: ignore
 from src.models.employee import db, Holiday, AutonomousCommunity, Province
 from src.services.holiday_service import HolidayService
 from datetime import datetime, date
 import calendar as cal
-from flask_security import auth_required
+from flask_security import auth_required # type: ignore
 
 holiday_bp = Blueprint('holiday', __name__)
 holiday_service = HolidayService()
