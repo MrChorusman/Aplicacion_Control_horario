@@ -1,175 +1,252 @@
-import React, { useState, useEffect } from 'react';
-import { apiService } from '../services/api';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import ApiService from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import ConfirmModal from './ConfirmModal';
+import { Button } from './ui/button';
+import { Select } from './ui/select';
+import { LoadingSpinner, LoadingCard, LoadingTable } from './ui/loading-spinner';
+import { ErrorBoundary } from './ui/error-boundary';
+import { useAsync } from '../hooks/useAsync';
+
+const api = new ApiService();
 
 const Dashboard = () => {
-  const [dashboardData, setDashboardData] = useState({
-    selectedMonth: new Date().getMonth() + 1,
-    selectedYear: new Date().getFullYear(),
-    data: null,
-    loading: true,
-    error: null
-  });
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
+  
+  // Estados para eliminación de empleado
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [pendingDeleteName, setPendingDeleteName] = useState('');
+  
+  // Usar el nuevo contexto de autenticación
+  const { user, hasRole } = useAuth();
 
-  useEffect(() => {
-    loadDashboardData();
-  }, [dashboardData.selectedMonth, dashboardData.selectedYear]);
-
-  const loadDashboardData = async () => {
-    try {
-      setDashboardData(prev => ({ ...prev, loading: true, error: null }));
-
-      const { selectedMonth, selectedYear } = dashboardData;
-      
-      const response = await apiService.getForecast(selectedYear, selectedMonth);
-
-      if (response.success) {
-        setDashboardData(prev => ({
-          ...prev,
-          data: response.data,
-          loading: false
-        }));
-      } else {
-        setDashboardData(prev => ({
-          ...prev,
-          error: 'Error al cargar datos del dashboard',
-          loading: false
-        }));
-      }
-    } catch (err) {
-      console.error('Error loading dashboard:', err);
-      setDashboardData(prev => ({
-        ...prev,
-        error: 'Error al cargar datos del dashboard',
-        loading: false
-      }));
+  // Función memoizada para cargar datos
+  const loadDashboardData = useCallback(async () => {
+    const response = await api.getForecast(selectedYear, selectedMonth);
+    if (!response.success) {
+      throw new Error(response.message || 'Error al cargar datos del dashboard');
     }
-  };
+    return response.data;
+  }, [selectedYear, selectedMonth]);
 
-  const getStatusClass = (status) => {
+  // Hook personalizado para manejar el estado async
+  const { 
+    data: dashboardData, 
+    isLoading, 
+    isError, 
+    error, 
+    retry 
+  } = useAsync(loadDashboardData, true, [selectedYear, selectedMonth]);
+
+  // Datos memoizados para optimizar renders
+  const overallSummary = useMemo(() => 
+    dashboardData?.overall_summary || {}, [dashboardData]);
+  
+  const teams = useMemo(() => 
+    dashboardData?.teams || [], [dashboardData]);
+
+  // Lista de empleados memoizada
+  const allEmployees = useMemo(() => {
+    const employees = [];
+    teams.forEach(team => {
+      if (team.employees) {
+        team.employees.forEach(employee => {
+          employees.push({
+            ...employee,
+            team_name: team.team_name
+          });
+        });
+      }
+    });
+    return employees;
+  }, [teams]);
+
+  const selectedEmployee = useMemo(() => 
+    allEmployees.find(emp => emp.employee_id === selectedEmployeeId), 
+    [allEmployees, selectedEmployeeId]);
+
+  // Opciones para los selects memoizadas
+  const monthOptions = useMemo(() => 
+    Array.from({length: 12}, (_, i) => ({
+      value: i + 1,
+      label: new Date(2024, i).toLocaleDateString('es-ES', { month: 'long' })
+    })), []);
+  
+  const yearOptions = useMemo(() => [
+    { value: 2024, label: '2024' },
+    { value: 2025, label: '2025' }
+  ], []);
+
+  const employeeOptions = useMemo(() => [
+    { value: '', label: '-- Selecciona --' },
+    ...allEmployees.map(emp => ({
+      value: emp.employee_id,
+      label: emp.full_name
+    }))
+  ], [allEmployees]);
+
+  // Funciones auxiliares memoizadas
+  const getStatusClass = useCallback((status) => {
     switch (status) {
       case 'Excelente': return 'status-excellent';
       case 'Bueno': return 'status-good';
       case 'Mejorable': return 'status-poor';
       default: return 'status-neutral';
     }
-  };
+  }, []);
 
-  const getEfficiencyClass = (efficiency) => {
+  const getEfficiencyClass = useCallback((efficiency) => {
     if (efficiency >= 95) return 'efficiency-excellent';
     if (efficiency >= 85) return 'efficiency-good';
     return 'efficiency-poor';
-  };
+  }, []);
 
-  const handleMonthChange = (month) => {
-    setDashboardData(prev => ({ ...prev, selectedMonth: parseInt(month) }));
-  };
+  // Handlers memoizados
+  const handleMonthChange = useCallback((e) => {
+    setSelectedMonth(parseInt(e.target.value));
+  }, []);
 
-  const handleYearChange = (year) => {
-    setDashboardData(prev => ({ ...prev, selectedYear: parseInt(year) }));
-  };
+  const handleYearChange = useCallback((e) => {
+    setSelectedYear(parseInt(e.target.value));
+  }, []);
 
-  const getMonthName = (month, year) => {
+  const handleEmployeeSelect = useCallback((e) => {
+    setSelectedEmployeeId(Number(e.target.value) || null);
+  }, []);
+
+  const getMonthName = useCallback((month, year) => {
     return new Date(year, month - 1).toLocaleDateString('es-ES', { 
       month: 'long', 
       year: 'numeric' 
     });
-  };
+  }, []);
 
-  if (dashboardData.loading) {
-    return (
-      <div style={{ 
-        backgroundColor: 'white', 
-        borderRadius: '12px', 
-        padding: '25px', 
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-        width: '100%',
-        boxSizing: 'border-box'
-      }}>
-        <div className="loading-message">
-          <div className="loading-spinner"></div>
-          <p>Cargando dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (dashboardData.error) {
-    return (
-      <div style={{ 
-        backgroundColor: 'white', 
-        borderRadius: '12px', 
-        padding: '25px', 
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-        width: '100%',
-        boxSizing: 'border-box'
-      }}>
-        <div className="error-message">
-          <h3>❌ Error</h3>
-          <p>{dashboardData.error}</p>
-          <button onClick={loadDashboardData} className="btn btn-primary">
-            🔄 Reintentar
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const { data } = dashboardData;
-  const overallSummary = data?.overall_summary || {};
-  const teams = data?.teams || [];
-
-  // Crear lista de empleados de todos los equipos para el grid principal
-  const allEmployees = [];
-  teams.forEach(team => {
-    if (team.employees) {
-      team.employees.forEach(employee => {
-        allEmployees.push({
-          ...employee,
-          team_name: team.team_name
-        });
-      });
+  // Funciones de eliminación de empleado memoizadas
+  const handleDeleteClick = useCallback((employeeId, employeeName) => {
+    // Verificar permisos de administrador o manager
+    if (!hasRole('admin') && !hasRole('manager')) {
+      alert('❌ No tienes permisos para eliminar empleados');
+      return;
     }
-  });
+    
+    setPendingDeleteId(employeeId);
+    setPendingDeleteName(employeeName);
+    setShowConfirmModal(true);
+  }, [hasRole]);
 
-  const selectedEmployee = allEmployees.find(emp => emp.employee_id === selectedEmployeeId);
+  const handleConfirmDelete = useCallback(async () => {
+    if (pendingDeleteId) {
+      try {
+        const response = await api.deleteEmployee(pendingDeleteId);
+        if (response.success) {
+          // Recargar datos del dashboard
+          retry();
+          alert('✅ Empleado eliminado correctamente');
+        } else {
+          alert('❌ Error al eliminar empleado: ' + (response.message || 'Error desconocido'));
+        }
+      } catch (error) {
+        console.error('Error deleting employee:', error);
+        alert('❌ Error de conexión al eliminar empleado');
+      } finally {
+        setPendingDeleteId(null);
+        setPendingDeleteName('');
+        setShowConfirmModal(false);
+      }
+    }
+  }, [pendingDeleteId, retry]);
 
-  return (
-    <div style={{ 
-      backgroundColor: 'white', 
-      borderRadius: '12px', 
-      padding: '25px', 
-      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-      width: '100%',
-      boxSizing: 'border-box'
-    }}>
-      {/* CABECERA */}
-      <div className="dashboard-header">
-        <div className="dashboard-title">
-          <h1>📊 Dashboard - {getMonthName(dashboardData.selectedMonth, dashboardData.selectedYear)}</h1>
-          <div className="dashboard-controls">
-            <select
-              value={dashboardData.selectedMonth}
-              onChange={(e) => handleMonthChange(e.target.value)}
-              className="dashboard-select"
-            >
-              {Array.from({length: 12}, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {new Date(2024, i).toLocaleDateString('es-ES', { month: 'long' })}
-                </option>
-              ))}
-            </select>
-            
-            <select
-              value={dashboardData.selectedYear}
-              onChange={(e) => handleYearChange(e.target.value)}
-              className="dashboard-select"
-            >
-              <option value={2024}>2024</option>
-              <option value={2025}>2025</option>
-            </select>
+  const handleCloseModal = useCallback(() => {
+    setShowConfirmModal(false);
+    setPendingDeleteId(null);
+    setPendingDeleteName('');
+  }, []);
+
+  // Estados de carga y error optimizados
+  if (isLoading) {
+    return (
+      <div 
+        className="bg-white rounded-lg p-6 shadow-md w-full"
+        role="status"
+        aria-live="polite"
+        aria-label="Cargando dashboard"
+      >
+        <LoadingSpinner 
+          size="lg" 
+          message="Cargando datos del dashboard..." 
+        />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div 
+        className="bg-white rounded-lg p-6 shadow-md w-full"
+        role="alert"
+        aria-live="assertive"
+      >
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-12 w-12 text-error">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
           </div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            Error al cargar el dashboard
+          </h3>
+          <p className="text-gray-600 mb-4">
+            {error?.message || 'Ocurrió un error inesperado'}
+          </p>
+          <Button 
+            variant="primary" 
+            onClick={retry}
+            aria-label="Reintentar carga de datos"
+          >
+            🔄 Reintentar
+          </Button>
         </div>
+      </div>
+    );
+  }
+
+  // JSX principal del Dashboard
+  return (
+    <ErrorBoundary>
+      <div 
+        className="bg-white rounded-lg p-6 shadow-md w-full"
+        role="main"
+        aria-label="Dashboard principal"
+      >
+        {/* CABECERA */}
+        <header className="dashboard-header">
+          <div className="dashboard-title">
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <span role="img" aria-label="estadísticas">📊</span>
+              Dashboard - {getMonthName(selectedMonth, selectedYear)}
+            </h1>
+            <div className="dashboard-controls" role="group" aria-label="Controles de fecha">
+              <Select
+                value={selectedMonth}
+                onChange={handleMonthChange}
+                options={monthOptions}
+                aria-label="Seleccionar mes"
+                className="min-w-40"
+              />
+              
+              <Select
+                value={selectedYear}
+                onChange={handleYearChange}
+                options={yearOptions}
+                aria-label="Seleccionar año"
+                className="min-w-24"
+              />
+            </div>
+          </div>
 
         <div className="dashboard-summary-cards">
           {/* Cuadro 1: Horas Teóricas */}
@@ -255,6 +332,8 @@ const Dashboard = () => {
                   <th>HORAS REALES INDRA</th>
                   <th>EFICIENCIA</th>
                   <th>ESTADO</th>
+                  <th>CIUDAD/LOCALIDAD</th>
+                  <th>ACCIONES</th>
                 </tr>
               </thead>
               <tbody>
@@ -273,6 +352,34 @@ const Dashboard = () => {
                     </td>
                     <td className={`status-cell ${getStatusClass(employee.status)}`}>
                       {employee.status || 'N/A'}
+                    </td>
+                    <td className="city-cell">{employee.city_name || 'N/A'}</td>
+                    <td className="actions-cell">
+                      {(hasRole('admin') || hasRole('manager')) && (
+                        <button
+                          onClick={() => handleDeleteClick(employee.employee_id, employee.full_name)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#dc3545',
+                            fontSize: '1.2em',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            transition: 'background-color 0.2s'
+                          }}
+                          title="Eliminar empleado"
+                          onMouseOver={(e) => e.target.style.backgroundColor = '#f8d7da'}
+                          onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+                        >
+                          🗑️
+                        </button>
+                      )}
+                      {!hasRole('admin') && !hasRole('manager') && (
+                        <span style={{ color: '#6c757d', fontSize: '0.9em' }}>
+                          Sin permisos
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -369,6 +476,14 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {/* MODALES */}
+      <ConfirmModal
+        open={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleConfirmDelete}
+        message={`¿Estás seguro de que deseas eliminar al empleado "${pendingDeleteName}"? Esta acción no se puede deshacer.`}
+      />
     </div>
   );
 };
