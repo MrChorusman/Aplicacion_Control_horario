@@ -1,5 +1,21 @@
+/* ===== IMPORTAR FUENTES Y DESIGN TOKENS ===== */
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;500;600;700;800&display=swap');
+@import './styles/design-tokens.css';
+
+/* ===== RESET Y BASE STYLES ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Aplicar Nunito Sans globalmente */
+* {
+  font-family: var(--font-family-base) !important;
+}
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
@@ -26,7 +42,17 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  /* Elimina display: flex y place-items: center */
+  font-family: var(--font-family-base) !important;
+  background-color: var(--color-gray-50);
+  color: var(--color-gray-900);
+  line-height: var(--line-height-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Forzar Nunito Sans en elementos específicos */
+h1, h2, h3, h4, h5, h6, p, span, div, button, input, label {
+  font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif !important;
 }
 
 h1 {
